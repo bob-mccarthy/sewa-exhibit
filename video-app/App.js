@@ -1,10 +1,44 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
+import EventSource from "react-native-sse";
+import { useEffect, useState } from 'react';
+
+
 
 export default function App() {
+  const [testText, setTestText] = useState('nothing')
+  useEffect(() => {
+    const es = new EventSource("http://192.168.0.222/events");
+
+    es.addEventListener("open", (event) => {
+      console.log("Open SSE connection.");
+    });
+
+    es.addEventListener("message", (event) => {
+      setTestText(testText + event.data)
+      console.log("New message event:", event.data);
+    });
+
+    es.addEventListener("error", (event) => {
+      if (event.type === "error") {
+        console.error("Connection error:", event.message);
+      } else if (event.type === "exception") {
+        console.error("Error:", event.message, event.error);
+      }
+    });
+
+    es.addEventListener("close", (event) => {
+      console.log("Close SSE connection.");
+    });
+    return () => {
+      es.removeAllEventListeners();
+      es.close();
+    };
+  },[])
   return (
     <View style={styles.container}>
       <Text>word</Text>
+      <Text>{testText}</Text>
       <StatusBar style="auto" />
     </View>
   );
