@@ -1,12 +1,19 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet} from 'react-native';
 import EventSource from "react-native-sse";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, createContext } from 'react';
+import VideoScreen from './screens/VideoScreen'; 
+import SelectScreen from './screens/SelectScreen';
+import {NavigationContainer} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import ActionContext from './Context';
 
+
+const Stack = createNativeStackNavigator();
+// const ActionContext = createContext(null);
 
 
 export default function App() {
-  const [testText, setTestText] = useState('nothing')
+  const [action, setAction] = useState({message: 'nothing'})
   useEffect(() => {
     const es = new EventSource("http://192.168.0.222/events");
 
@@ -15,7 +22,8 @@ export default function App() {
     });
 
     es.addEventListener("message", (event) => {
-      setTestText(testText + event.data)
+      setAction(JSON.parse(event.data))
+      console.log({newMessage: JSON.parse(event.data)})
       console.log("New message event:", event.data);
     });
 
@@ -35,12 +43,22 @@ export default function App() {
       es.close();
     };
   },[])
+
   return (
-    <View style={styles.container}>
-      <Text>word</Text>
-      <Text>{testText}</Text>
-      <StatusBar style="auto" />
-    </View>
+    <ActionContext.Provider value = {action}>
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName='select' screenOptions={{headerShown: false}}>
+        <Stack.Screen
+          name="video"
+          component={VideoScreen}
+        />
+        <Stack.Screen
+          name="select"
+          component={SelectScreen}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+    </ActionContext.Provider>
   );
 }
 
