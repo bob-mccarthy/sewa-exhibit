@@ -3,6 +3,7 @@ import EventSource from "react-native-sse";
 import { useEffect, useState, createContext } from 'react';
 import VideoScreen from './screens/VideoScreen'; 
 import SelectScreen from './screens/SelectScreen';
+import DimensionScreen from './screens/DimensionScreen';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import ActionContext from './Context';
@@ -12,7 +13,7 @@ import * as FileSystem from 'expo-file-system'
 
 const readDir = async () => {
   let documents = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory)
-  let info = await FileSystem.getInfoAsync(FileSystem.documentDirectory + 'cool-vid.mp4')
+  let info = await FileSystem.getInfoAsync(FileSystem.documentDirectory + 'display-vid.mp4')
   console.log(documents)
   console.log({info})
   let modTime = new Date(0)
@@ -73,6 +74,10 @@ export default function App() {
         <Stack.Screen
           name="select"
           component={SelectScreen}
+        />
+        <Stack.Screen
+          name="dim"
+          component={DimensionScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

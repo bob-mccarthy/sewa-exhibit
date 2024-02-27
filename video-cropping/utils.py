@@ -35,6 +35,31 @@ def intersect(a,b):
     return (intersection, nonIntersectedParts)
   return (None, [b])
 
+def calculateBoundsForCenteredGivenScreen(screenWidth, screenHeight, videoWidth, videoHeight):
+  scaleFacY = videoHeight/screenHeight #ratio of the height of our video to the height of our screen
+  scaleFacX = videoWidth/screenWidth #ratio of the width of our video to the width of our screen 
+  # print(scaleFacX)
+
+  #we want to pick the scale factors which will give us dimensions that make our screen smaller than our video 
+  #because we do not want our video to have black bars.
+  #So we pick scaleFacX if scaleFacX * height of our screen is less than or equal the height of our video
+  #But if is not then we know that scaleY * the width of our screen is less than or equal to width so we pick that one
+  finalScaleFac = scaleFacX if scaleFacX * screenHeight <= videoHeight  else scaleFacY
+
+  #get the dimension of the screen in pixels
+  screenDimX = screenWidth * finalScaleFac 
+  screenDimY = screenHeight * finalScaleFac
+
+
+  screenCenterX = screenDimX / 2
+  screenCenterY = screenDimY / 2
+
+  videoCenterX = videoWidth / 2
+  videoCenterY = videoHeight / 2
+  #returns coordinate of the Top Left corner are on the original video, and the scale Factor to go from screen size to videoSize
+  return [[int(videoCenterX - screenCenterX), int(videoCenterY - screenCenterY)], finalScaleFac]
+
+
 
 #calculates bounds to center video given its dimensions(wxh) and the number of phones in the grid columns x rows (cxr)
 # assuming that each phone as an aspect ratio of 9x16
@@ -53,12 +78,10 @@ def calculateBoundsForCentered(c,r,w,h):
   #So we pick scaleFacX if scaleFacX * height of our screen is less than or equal the height of our video
   #But if is not then we know that scaleY * the width of our screen is less than or equal to width so we pick that one
   finalScaleFac = scaleFacX if scaleFacX * totalAspectRatioY <= h  else scaleFacY
-  print(finalScaleFac)
 
   #get the dimension of the screen in pixels
   screenDimX = totalAspectRatioX * finalScaleFac 
   screenDimY = totalAspectRatioY * finalScaleFac
-  print(657 + totalAspectRatioX * finalScaleFac )
 
   screenCenterX = screenDimX // 2
   screenCenterY = screenDimY // 2
@@ -71,24 +94,4 @@ def calculateBoundsForCentered(c,r,w,h):
 
 
 
-# def concatenate_videos(inputVideos, output_path):
-    
-#     # Create a list of input video files
-#     inputArgs = []
-#     for video in inputVideos:
-#       inputArgs.append(ffmpeg.input(video))
 
-#     # Concatenate the input videos
-#     ffmpeg.concat(*inputArgs).output(output_path).run()
-
-# # Example usage
-# # video_list = ["test-scale.mp4","drakex21.mp4"]
-# video_list = ["test-scale.mp4"]
-# output_video = "test123.mp4"
-# ffmpeg.input("drakex21.mp4").trim(start_frame  = 100).setpts('PTS-STARTPTS').output('test-trim.mp4').run()
-
-# ffmpeg.input("test_video.mp4").output('test-scale.mp4', vf = 'scale=1280:720').run()
-
-# concatenate_videos(video_list, output_video)
-
-print(calculateBoundsForCentered(1000,1000, 1920, 1080))

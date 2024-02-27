@@ -11,6 +11,7 @@ class Video:
     self.end = end if end else float(metadata['streams'][0]['duration']) #where the video should end if no option is provided it defaults to the end of the video
     self.totDim = totDim #dimensions of the original video [width, height]
     self.cropDim = cropDim #dimensions of the crop on the video [width, height]
+    # self.cropDim = [min(cropDim[0], totDim[0] )]
     self.cropPos = cropPos #position of the top left corner of the part of the video to be cropped [x,y]
     self.timelineStart = timelineStart #where on the timeline the video starts playing
 
@@ -55,10 +56,12 @@ class Video:
   #modify the start, end and timelineStart to fit in this newtimeline
   def modifyToNewInterval(self, newTimelineStart, newTimelineEnd):
     #modify the end of the video by the same amount the timeline end was moved by (which is equal to (self.timelineStart + (self.end + self.start)) )
-    self.end += newTimelineEnd - (self.timelineStart + (self.end + self.start)) 
+    self.end += newTimelineEnd - (self.timelineStart + (self.end - self.start)) 
+
     #the start should be moved the same amount the timelinestart was moved by
     self.start += newTimelineStart - self.timelineStart
     self.timelineStart = newTimelineStart
+
 
 # import ffmpeg
 

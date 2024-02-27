@@ -1,6 +1,7 @@
-import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { useState, useEffect, useContext } from 'react';
 import ActionContext from '../Context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system'
 
 
@@ -8,18 +9,19 @@ import * as FileSystem from 'expo-file-system'
 const baseUrl = 'http://192.168.0.223'
 
 
-export default function SelectScreen({navigation, route}) {
+export default function SelectScreen({navigation}) {
   const action = useContext(ActionContext)
+  const {approxHeight, approxWidth} = useWindowDimensions();
   const [gridDim, setGridDim] = useState({r:0, c:0})
   const [buttonGrid, setButtonGrid] = useState(null)
-  const [phonePos, setPhonePos] = useState(null)
+  const [phonePos, setPhonePos] = useState(null) //position of the phones in the grid [row, col], 1-indexed
+  const [downloadProgress, setDownloadProgress] = useState(null)
 
   const download = async (row, col) => {
     const callback = downloadProgress => {
       const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
-      console.log(progress)
+      setDownloadProgress(progress)
     };
-    console.log({row, col})
     const downloadResumable = FileSystem.createDownloadResumable(
       `http://192.168.0.223/video/${row}/${col}`,
       FileSystem.documentDirectory + 'display-vid.mp4',
@@ -36,6 +38,32 @@ export default function SelectScreen({navigation, route}) {
     }
     
   }
+
+  const selectPhonePos = async (i, j) => {
+    setPhonePos([i+1, j+1])
+    
+    let width = await AsyncStorage.getItem('width')
+    let height = await AsyncStorage.getItem('height')
+    console.log('after await')
+    if (width === null){
+      width = approxWidth
+    }
+    if (height === null){
+      height = approxHeight
+    }
+    console.log('in select phone pos')
+    fetch('http://192.168.0.223/setDim', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        index: [i,j],
+        dimension: [width, height],
+      }),
+    });
+  } 
 
   useEffect(() => {
     fetch(`${baseUrl}/dim`)
@@ -54,7 +82,7 @@ export default function SelectScreen({navigation, route}) {
       for(let j = 0; j < gridDim.c; j++){
 
           currButtonRow.push(
-              <TouchableOpacity style = {[styles.gridBtn,(phonePos && phonePos[0]-1 == i && phonePos[1]-1 == j)? styles.selected: styles.unselected]} key={`${i+1},${j+1}`} onPress = {() => setPhonePos([i+1, j+1])}>
+              <TouchableOpacity style = {[styles.gridBtn,(phonePos && phonePos[0]-1 == i && phonePos[1]-1 == j)? styles.selected: styles.unselected]} key={`${i+1},${j+1}`} onPress = {() => selectPhonePos(i, j)}>
                 <Text style = {{textAlign: 'center'}}>
                 {`r:${i+1},c:${j+1}`}
                 </Text>
@@ -81,21 +109,31 @@ export default function SelectScreen({navigation, route}) {
       <Text>
         Server Message: {action?.message}
       </Text>
-      <TouchableOpacity style = {styles.btn} onPress={() => {
-        if(phonePos !== null){
-          navigation.navigate("video", {phonePos})
-        }
-        }}>
-        <Text style = {{textAlign:'center'}}>
-          Go to Video Screen
-        </Text>
-      </TouchableOpacity>
-
+      <View style = {styles.btnsContainer}>
+        <TouchableOpacity style = {styles.btn} onPress={() => {
+          if(phonePos !== null){
+            navigation.navigate("video", {phonePos})
+          }
+          }}>
+          <Text style = {{textAlign:'center'}}>
+            Go to Video Screen
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style = {styles.btn} onPress={() => navigation.navigate("dim")}>
+          <Text style = {{textAlign:'center'}}>
+            Go to Dimension Screen
+          </Text>
+        </TouchableOpacity>
+      </View>
       {phonePos && <TouchableOpacity style = {styles.btn} onPress={() => download(...phonePos)}>
         <Text style = {{textAlign:'center'}}>
           Download Video
         </Text>
       </TouchableOpacity>}
+      {downloadProgress && 
+        <Text>
+          Download Progress: {downloadProgress === 1 ? 'Done' : `${Math.round(downloadProgress * 100)}%`}
+        </Text>}
       
     </SafeAreaView>
   )
@@ -138,10 +176,15 @@ const styles = StyleSheet.create({
   },
   btn: {
     height:50,
-    width: '100%',
+    width: '50%',
     backgroundColor: 'skyblue',
     borderRadius: 10,
     justifyContent:'center',
     alignContent: 'center',
+  },
+  btnsContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 5
   }
 });
