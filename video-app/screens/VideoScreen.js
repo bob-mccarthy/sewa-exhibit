@@ -5,7 +5,8 @@ import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-g
 import ActionContext from '../Context';
 import ntpClient from 'react-native-ntp-client';
 import * as FileSystem from 'expo-file-system'
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Updates from 'expo-updates';
 
 
 
@@ -14,11 +15,39 @@ const baseUrl = 'http://192.168.0.223'
 
 export default function VideoScreen({navigation, route}) {
   const action = useContext(ActionContext)
-  const [isVisible, setIsVisible] = useState(true)
-  const {phonePos} = route.params //determines which phone that we get
   const [showHeader, setShowHeader] = useState(false)
   const [paused, setPaused] = useState(true)
   const videoRef = useRef(null)
+  const refreshPage = async() =>{
+    try {
+      // Reload the app
+      await Updates.reloadAsync();
+    } catch (error) {
+      console.error('Failed to reload the app:', error);
+    }
+  }
+  const download = async (row, col) => {
+    const callback = downloadProgress => {
+      const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+    };
+    console.log(`http://192.168.0.223/video/${row}/${col}`)
+    const downloadResumable = FileSystem.createDownloadResumable(
+      `http://192.168.0.223/video/${row}/${col}`,
+      FileSystem.documentDirectory + 'display-vid.mp4',
+      {},
+      callback
+    );
+  
+    try {
+      console.log('starting to download')
+      const { uri } = await downloadResumable.downloadAsync();
+      console.log('Finished downloading to ', uri);
+      refreshPage()
+    } catch (e) {
+      console.error(e);
+    } 
+  }
+
   // const handleProgress = ({currentTime, playableDuration, seekableDuration}) =>{
   //   console.log({currentTime, playableDuration, seekableDuration})
   //   if(currentTime >= 20){
@@ -36,6 +65,7 @@ export default function VideoScreen({navigation, route}) {
     });
   useEffect(() => {
     if(action?.message === 'start'){
+      setPaused(true)
       videoRef.current?.seek(0)
       ntpClient.getNetworkTime("192.168.0.223", 123, (error, date) => {
           if (error) {
@@ -47,6 +77,7 @@ export default function VideoScreen({navigation, route}) {
           setTimeout(() => {
             setPaused(false)
             console.log(`starting to play at: ${new Date()}`)
+            fetch(`${baseUrl}/logStart`)
           }, startTime - currTime)
           // setTimeout(() => {
           //   setIsVisible(true)
@@ -64,15 +95,25 @@ export default function VideoScreen({navigation, route}) {
     else if (action?.message === 'restart'){
       videoRef.current?.seek(0)
     }
-    else if (action?.message === 'setVisibility'){
-      setIsVisible(action.visibility)
+    else if (action?.message === 'download'){
+      AsyncStorage.getItem('phonePos').then((phonePos) => {
+        if (phonePos !== null){
+          // console.log(JSON.parse(phonePos))
+          download(...JSON.parse(phonePos))
+          
+        }
+      })
+      // download()
+    }
+    else if (action?.message === 'refresh'){
+      refreshPage()
     }
   }, [action])
   
   
 
   return (
-    <SafeAreaView style = {{width: '100%', height: '100%'}}>
+    <SafeAreaView style = {{width: '100%', height: '100vh'}}>
     <GestureHandlerRootView style = {styles.view}>
       {showHeader && 
         <SafeAreaView style = {styles.header}>
@@ -84,15 +125,14 @@ export default function VideoScreen({navigation, route}) {
         </SafeAreaView>
       }
       <GestureDetector s gesture={tap}>
-        <View style = {styles.videoCoverContainer}>
-        <SafeAreaView style = {[styles.videoCover, {zIndex: isVisible ? 0: 1}]}>
+        <SafeAreaView style = {styles.videoCoverContainer}>
+        <SafeAreaView style = {[styles.videoCover, {zIndex: paused ? 1: 0}]}>
         </SafeAreaView>
         <SafeAreaView style = {styles.videoContainer} >
           <Video 
             ref = {videoRef}
             style = {styles.video}
             source = {{uri: FileSystem.documentDirectory + 'display-vid.mp4'}}
-            // source = {{uri: `${baseUrl}/video/${phonePos[0]}/${phonePos[1]}`}}
             controls = {false}
             fullscreen = {false}
             volume={0.5}
@@ -107,7 +147,7 @@ export default function VideoScreen({navigation, route}) {
             >
           </Video>
         </SafeAreaView>
-        </View>
+        </SafeAreaView>
       </GestureDetector>
     </GestureHandlerRootView>
     </SafeAreaView>
@@ -116,27 +156,27 @@ export default function VideoScreen({navigation, route}) {
 
 const styles = StyleSheet.create({
   view: {
-
     alignItems: 'center',
-    flex: 1,
+    flex: 0,
     // flexDirection: 'column',
     justifyContent: 'center',
     backgroundColor: 'white',
     
   },
   header:{
-    flex:1,
+    flex:0,
     backgroundColor: 'black',
     width: '100%',
-    maxHeight: 100,
-    minHeight: 50,
+    height: 50,
     // maxHeight: 100,
     zIndex:1
   },
   btn:{
+    flex: 1,
+    flexDirection: 'column-reverse',
     width: '100%',
     height: '100%',
-    backgroundColor: 'lightblue'
+    backgroundColor: 'lightblue',
   },
   videoCoverContainer:{
     position: 'relative',

@@ -6,12 +6,12 @@ import * as FileSystem from 'expo-file-system'
 
 
 
+
 const baseUrl = 'http://192.168.0.223'
 
 
 export default function SelectScreen({navigation}) {
   const action = useContext(ActionContext)
-  const {approxHeight, approxWidth} = useWindowDimensions();
   const [gridDim, setGridDim] = useState({r:0, c:0})
   const [buttonGrid, setButtonGrid] = useState(null)
   const [phonePos, setPhonePos] = useState(null) //position of the phones in the grid [row, col], 1-indexed
@@ -35,24 +35,31 @@ export default function SelectScreen({navigation}) {
       console.log('Finished downloading to ', uri);
     } catch (e) {
       console.error(e);
+    } 
+  }
+
+  const storeInfo = async (key, val) => {
+    try {
+      let item = await AsyncStorage.setItem(key, val);
+    } catch (e) {
+      console.log(e)
     }
-    
   }
 
   const selectPhonePos = async (i, j) => {
     setPhonePos([i+1, j+1])
     
+    storeInfo('phonePos', JSON.stringify([i+1, j+1]))
     let width = await AsyncStorage.getItem('width')
     let height = await AsyncStorage.getItem('height')
-    console.log('after await')
-    if (width === null){
-      width = approxWidth
+    let isTablet = await AsyncStorage.getItem('isTablet')
+    let offsetY = await AsyncStorage.getItem('offsetY')
+    // if this is a tablet it is then in landscape mode and we need to swap its width and height 
+    if(isTablet){
+      [width, height] = [height,width]
     }
-    if (height === null){
-      height = approxHeight
-    }
-    console.log('in select phone pos')
-    fetch('http://192.168.0.223/setDim', {
+    //send phone pos, and dimensions to servers (dimensions will be null if they have not been set)
+    fetch('http://192.168.0.223/dim', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -60,7 +67,8 @@ export default function SelectScreen({navigation}) {
       },
       body: JSON.stringify({
         index: [i,j],
-        dimension: [width, height],
+        dimension: [parseFloat(width), parseFloat(height), parseFloat(offsetY)],
+        isTablet: isTablet === null ? false : isTablet,
       }),
     });
   } 
@@ -69,6 +77,12 @@ export default function SelectScreen({navigation}) {
     fetch(`${baseUrl}/dim`)
       .then(payload => payload.json())
       .then(gridDimension => setGridDim(gridDimension))
+
+      AsyncStorage.getItem('phonePos').then((oldPhonePos) => {
+        if (oldPhonePos !== null){
+          setPhonePos(JSON.parse(oldPhonePos))
+        }
+      })
   }, [])
 
   useEffect(() => {
@@ -87,10 +101,7 @@ export default function SelectScreen({navigation}) {
                 {`r:${i+1},c:${j+1}`}
                 </Text>
               </TouchableOpacity>   
-          )
-        
-
-        
+          )        
       }
       newButtonGrid.push(
           <View style = {[styles.btnRow, {maxHeight:`${Math.round(100/gridDim.r)}%`}]} key = {i}>

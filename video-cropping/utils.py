@@ -38,7 +38,7 @@ def intersect(a,b):
 def calculateBoundsForCenteredGivenScreen(screenWidth, screenHeight, videoWidth, videoHeight):
   scaleFacY = videoHeight/screenHeight #ratio of the height of our video to the height of our screen
   scaleFacX = videoWidth/screenWidth #ratio of the width of our video to the width of our screen 
-  # print(scaleFacX)
+
 
   #we want to pick the scale factors which will give us dimensions that make our screen smaller than our video 
   #because we do not want our video to have black bars.
@@ -49,7 +49,6 @@ def calculateBoundsForCenteredGivenScreen(screenWidth, screenHeight, videoWidth,
   #get the dimension of the screen in pixels
   screenDimX = screenWidth * finalScaleFac 
   screenDimY = screenHeight * finalScaleFac
-
 
   screenCenterX = screenDimX / 2
   screenCenterY = screenDimY / 2
@@ -93,5 +92,39 @@ def calculateBoundsForCentered(c,r,w,h):
   return [[videoCenterX - screenCenterX, videoCenterY - screenCenterY],[videoCenterX + screenCenterX, videoCenterY + screenCenterY]]
 
 
+# import ffmpeg
+# import math
 
+# def rotate_video(input_file, output_file, rotation_angle):
+#     (
+#         ffmpeg
+#         .input(input_file)
+#         .filter('rotate', angle=rotation_angle)
+#         .output(output_file)
+#         .run()
+#     )
+
+# # Example usage:
+# input_file = './videos/input/drakex21.mp4'
+# output_file = 'output_rotated.mp4'
+# rotation_angle = math.pi/2  # Possible values: 'clock', 'cclock', 'cclock_flip', 'clock_flip'
+
+# def rotate_video(input_file, output_file, rotation_angle):
+#     (
+#         ffmpeg
+#         .input(input_file)
+#         .filter('transpose', dir='clock')  # Rotate counterclockwise
+#         # .filter('scale', w='iw*1.5', h='ih*1.5')  # Scale up to handle the aspect ratio change
+#         # .filter('crop', w='iw*0.75', h='ih*0.75')  # Crop to maintain the aspect ratio
+#         .output(output_file)
+#         .run()
+#     )
+
+# # Example usage:
+# input_file = './videos/input/drakex21.mp4'
+# output_file = 'output_rotated.mp4'
+
+# # rotate_video(input_file, output_file)
+# # 
+# rotate_video(input_file, output_file, rotation_angle)
 

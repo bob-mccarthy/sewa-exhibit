@@ -1,3 +1,4 @@
+import Checkbox from 'expo-checkbox';
 import React, { useEffect, useState } from 'react';
 import {View, StyleSheet, Text, useWindowDimensions,TextInput, TouchableOpacity} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,16 +9,22 @@ export default function DimensionScreen({navigation}) {
   const [screenHeightMM, setScreenHeightMM] = useState((height/160)*25.4)
   const [screenWidthPX, setScreenWidthPX] = useState(width)
   const [screenWidthMM, setScreenWidthMM] = useState((width/160)*25.4)
-  const storeDimension = async (key, val) => {
+  const [screenOffsetY, setScreenOffsetY] = useState(0)
+  const [isTablet, setIsTablet] = useState(false);
+
+  const storeInfo = async (key, val) => {
     try {
       let item = await AsyncStorage.setItem(key, val);
     } catch (e) {
       console.log(e)
     }
   }
-  const getDimension = async () => {
+
+  const getInfo = async () => {
     let width = await AsyncStorage.getItem('width')
     let height = await AsyncStorage.getItem('height')
+    let offsetY = await AsyncStorage.getItem('offsetY')
+    let prevIsTablet = await AsyncStorage.getItem('isTablet')
     if (width){
       setScreenWidthMM(width)
       setScreenHeightPX(Math.floor((width / 25.4) * 160))
@@ -26,10 +33,15 @@ export default function DimensionScreen({navigation}) {
       setScreenHeightMM(height)
       setScreenHeightPX(Math.floor((height / 25.4) * 160))
     }
+    if(prevIsTablet !== null){
+      setIsTablet(JSON.parse(prevIsTablet))
+    }
+    if(offsetY){
+      setScreenOffsetY(offsetY)
+    }
   }
   useEffect(() => {
-    
-    getDimension()
+    getInfo()
 
   }, [])
   const handleChangeHeight = (newText) => {
@@ -40,7 +52,7 @@ export default function DimensionScreen({navigation}) {
     }
     setScreenHeightMM(parseFloat(newText))
     setScreenHeightPX(Math.floor(parseFloat(newText) / 25.4 * 160))
-    storeDimension('height', String(parseFloat(newText)))
+    storeInfo('height', String(parseFloat(newText)))
   }
   const handleChangeWidth = (newText) => {
     if(isNaN(parseFloat(newText))){
@@ -49,11 +61,32 @@ export default function DimensionScreen({navigation}) {
     }
     setScreenWidthMM(parseFloat(newText))
     setScreenWidthPX(Math.floor(parseFloat(newText) / 25.4 * 160))
-    storeDimension('width', String(parseFloat(newText)))
+    storeInfo('width', String(parseFloat(newText)))
   }
+
+  const handleChangeIsTablet = (currIsTablet) => { 
+    setIsTablet(currIsTablet)
+    storeInfo("isTablet", String(currIsTablet))
+  }
+
+  const handleChangeOffset = (offsetY) => { 
+    setScreenOffsetY(offsetY)
+    storeInfo("offsetY", String(offsetY))
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Window Dimension Data</Text>
+      <View style = {styles.textInputContainer}>
+        <Text>Is this a Tablet?:</Text>
+        <Checkbox value={isTablet} onValueChange={handleChangeIsTablet} />
+      </View>
+
+      <View style = {styles.textInputContainer}>
+        <Text>Offset Y (mm):</Text>
+        <TextInput style = {styles.input} keyboardType={"number-pad"} onChangeText={handleChangeOffset}>{screenOffsetY}</TextInput>
+      </View>
+
       <Text>Height (px): {screenHeightPX}</Text>
       <View style = {styles.textInputContainer}>
         <Text>Height (mm):</Text>
@@ -65,6 +98,7 @@ export default function DimensionScreen({navigation}) {
         <Text>Width (mm):</Text>
         <TextInput style = {styles.input} keyboardType={"number-pad"} onChangeText={handleChangeWidth}>{screenWidthMM}</TextInput>
       </View>
+
       <TouchableOpacity style = {styles.btn} onPress={() => navigation.navigate("select")}>
         <Text style = {{textAlign:'center'}}>
           Back to Select Screen

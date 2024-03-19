@@ -2,14 +2,21 @@ import ffmpeg
 
 class Video:
   def __init__(self, filename, totDim,timelineStart,cropPos = [0,0],  cropDim = None, zIndex =0,start = 0, end = None):
+    # print(filename)
     self.filename = filename
     self.zIndex = zIndex
     self.start = start #where in the video should it start from its beginning (in seconds)
-    metadata = ffmpeg.probe(filename)
+    try:
+      metadata = ffmpeg.probe(filename)
+    except ffmpeg.Error as e:
+      # print('stdout:', e.stdout.decode('utf8'))
+      print('stderr:', e.stderr.decode('utf8'))
+      raise e
+    
     fpsNum, fpsDiv = metadata['streams'][0]['avg_frame_rate'].split('/')
     self.fps = int(fpsNum) / int(fpsDiv)
     self.end = end if end else float(metadata['streams'][0]['duration']) #where the video should end if no option is provided it defaults to the end of the video
-    self.totDim = totDim #dimensions of the original video [width, height]
+    self.totDim = [metadata['streams'][0]['width'], metadata['streams'][0]['height']] #dimensions of the original video [width, height]
     self.cropDim = cropDim #dimensions of the crop on the video [width, height]
     # self.cropDim = [min(cropDim[0], totDim[0] )]
     self.cropPos = cropPos #position of the top left corner of the part of the video to be cropped [x,y]
@@ -35,6 +42,7 @@ class Video:
     return self.zIndex
   
   def getVideoProcessingInfo(self):
+    print(self.cropDim, self.totDim)
     return [self.filename, self.start, self.end,self.fps, self.cropPos, self.cropDim]
     # return {'filename': self.filename,'start': self.start, 'end': self.end, 'cropPos' : self.cropPos, 'cropDim': self.cropDim}
 
