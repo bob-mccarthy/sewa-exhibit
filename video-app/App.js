@@ -9,6 +9,8 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import ActionContext from './Context';
 import * as FileSystem from 'expo-file-system'
 import * as Updates from 'expo-updates';
+import ws from './Socket';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 
@@ -26,80 +28,65 @@ const readDir = async () => {
 const Stack = createNativeStackNavigator();
 // const ActionContext = createContext(null);
 const baseUrl = 'http://192.168.0.223'
-const refreshRate = 120// how often the app will try and refresh  
 
 export default function App() {
-  const [action, setAction] = useState({message: 'nothing'})
+  const reload = async () => {
+    try {
+      console.log('reloading');
+      // Reload the app
+      await Updates.reloadAsync();
+    } catch (error) {
+        console.error('Failed to reload the app:', error);
+    }
+  }
   const [reloadID, setReloadID] = useState(null)
+  const [action, setAction] = useState({message: 'nothing'})
   useEffect(() => {
-    const es = new EventSource(`${baseUrl}/events`);
+   setReloadID(setTimeout(() => reload(),30000))
+
+   ws.onopen = () => {
+    // connection opened
+    ws.send('open'); // send a message
+    console.log('opening');
+    setInterval(() => {
+      AsyncStorage.getItem('phonePos').then((phonePos)=>{
+        console.log(`sending ping: ${phonePos}`)
+        ws.send(`ping: ${phonePos}`)
+      })
+      
+    }, 30 * 1000)
     setReloadID(prevReloadID => {
-      if(prevReloadID){
-        clearTimeout(prevReloadID); // Clear the previous timeout
-      }
-      return setTimeout(async () => {
-          try {
-              console.log('refresh open');
-              // Reload the app
-              await Updates.reloadAsync();
-          } catch (error) {
-              console.error('Failed to reload the app:', error);
-          }
-      }, 60 * 1000);
-  });
-    es.addEventListener("open", (event) => {
-      console.log("Open SSE connection.");
-      // console.log(reloadID)
-      // clearTimeout(reloadID)
-      setReloadID(prevReloadID => {
-        console.log({prevReloadID})
-        clearTimeout(prevReloadID); // Clear the previous timeout
-        return setTimeout(async () => {
-            try {
-                console.log('refresh open');
-                // Reload the app
-                await Updates.reloadAsync();
-            } catch (error) {
-                console.error('Failed to reload the app:', error);
-            }
-        }, refreshRate * 1000);
-    });
-    });
-
-    es.addEventListener("message", (event) => {
-      setAction(JSON.parse(event.data))
-      console.log({newMessage: JSON.parse(event.data)})
-      console.log("New message event:", event.data);
-      setReloadID(prevReloadID => {
-        console.log({prevReloadID})
-        clearTimeout(prevReloadID); // Clear the previous timeout
-        return setTimeout(async () => {
-            try {
-                console.log('refresh open');
-                // Reload the app
-                await Updates.reloadAsync();
-            } catch (error) {
-                console.error('Failed to reload the app:', error);
-            }
-        }, refreshRate * 1000);
-      });
-    });
-
-    es.addEventListener("error", (event) => {
-      if (event.type === "error") {
-        console.error("Connection error:", event.message);
-      } else if (event.type === "exception") {
-        console.error("Error:", event.message, event.error);
-      }
-    });
-
-    es.addEventListener("close", (event) => {
-      console.log("Close SSE connection.");
-    });
-    return () => {
-      es.removeAllEventListeners();
-      es.close();
-    };
+      console.log(prevReloadID)
+      clearTimeout(prevReloadID)
+      return setTimeout(() => reload(),45 * 1000)
+    })
+  }
+    
+    
+  ws.onmessage = e => {
+    // console.log(`message: ${e}`)
+    console.log(`message: ${JSON.stringify(e)}`)
+    setAction(JSON.parse(e.data))
+    setReloadID(prevReloadID => {
+      console.log(prevReloadID)
+      clearTimeout(prevReloadID)
+      return setTimeout(() => reload(),45 * 1000)
+    })
+  };
+  
+  ws.onerror = e => {
+    // an error occurred
+    console.log(e.message);
+  };
+  
+  ws.onclose = e => {
+    console.log('closing')
+    reload();
+    // connection closed
+    console.log(e.code, e.reason);
+  };
+  return () => {
+  };
   },[])
 
   useEffect(() => {

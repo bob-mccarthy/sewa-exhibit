@@ -25,6 +25,7 @@ class Timeline:
     self.xSpacing = xSpacing * mmToPixels
     self.isTablet = isTablet
     self.vidStartTimes={} #dictionary of videos ids with their timeline starts as the values
+    self.vidInfo = {} #dictionary containing video, dimensions and fps
     
     
     
@@ -69,12 +70,34 @@ class Timeline:
   #given the position of the top left phone in the grid (row, col), the size of the phone grid  (num rows, num cols), the filename of the video, aspect ratio of the video (wxh), 
   # the time it should start on the timeline, if that time should be absolutely positioned, the zIndex of the video, the video start and end if you want to trim the video, 
   #and the offset of the video from center
-  def addVideo(self, tlPos, gridSize, filename, ar, timelineStart,id, isAbs = True,relativeTo = None, zIndex = 0, vidStart = 0, vidEnd = None, vidOffset = [0,0]):
+  def addVideo(self, tlPos, gridSize, filename, timelineStart,id, isAbs = True,relativeTo = None, zIndex = 0, vidStart = 0, vidEnd = None, vidOffset = [0,0]):
     if tlPos[1] + gridSize[1] > self.width or tlPos[0] + gridSize[0] > self.height or tlPos[0] < 0 or tlPos[1]< 0:
       print(f'invalid phone position and grid size: {filename}: tlPos: {tlPos}, gridSize: {gridSize}')
       return 
+    
     rows, cols = gridSize
-
+    #get video information
+    if filename in self.vidInfo:
+      # print(filename)
+      # fps,width, height,end = self.vidInfo[filename]
+      fps = self.vidInfo[filename]['fps']
+      width = self.vidInfo[filename]['width']
+      height = self.vidInfo[filename]['height']
+      end = self.vidInfo[filename]['end']
+    else:
+      try:
+        metadata = ffmpeg.probe(filename)
+      except ffmpeg.Error as e:
+        # print('stdout:', e.stdout.decode('utf8'))
+        print('stderr:', e.stderr.decode('utf8'))
+        raise e
+      fpsNum, fpsDiv = metadata['streams'][0]['avg_frame_rate'].split('/')
+      fps = int(fpsNum) / int(fpsDiv)
+      width, height = metadata['streams'][0]['width'], metadata['streams'][0]['height']
+      end = float(metadata['streams'][0]['duration'])
+      
+      self.vidInfo[filename] = {'fps': fps, 'width':width, 'height': height, 'end': end}
+    ar = [width, height]
     #if the positioning of clip on the timeline is not absolute (it is relative)
     #then we loop through the last video in all of the grid slots this video will take up
     #find the video out of all of those slots that ends last and then our video will start
@@ -97,7 +120,7 @@ class Timeline:
 
 
     screenWidth, screenHeight, offset = self.getScreenDimInfo(tlPos, gridSize)
-    
+    # print(screenWidth, screenHeight, ar[0], ar[1])
     tl, scaleFac = calculateBoundsForCenteredGivenScreen(screenWidth, screenHeight, ar[0], ar[1]) # get the tl of the cropped video and scaleFactor which is (size of video/size of screen)
     # print(offset)
     tl[0] += vidOffset[0]
@@ -115,17 +138,17 @@ class Timeline:
         #top left x position of the devices is the x value of where the video starts + the spacing of all of the devices to its left - half of the devices width + the offset we calculated 
         #before * the factor to scale from screen size to video size 
         deviceTopLeftX = int(tl[0] + (((self.xSpacing * (j -tlPos[1])) - self.deviceDim[i][j][0] / 2 + offset ) * scaleFac))
-
+        
         self.phoneGrid[i][j].append(
           Video(
             filename, 
             ar, 
-            timelineStart, 
+            timelineStart,
+            fps, 
             cropPos = [deviceTopLeftX, deviceTopLeftY], 
-            
             cropDim=[int(int(self.deviceDim[i][j][0]) * scaleFac),int(int(self.deviceDim[i][j][1]) * scaleFac) ], 
             zIndex = zIndex, start=vidStart, 
-            end=vidEnd
+            end=vidEnd if vidEnd is not None else end
             )
           )
         if not duration:
@@ -162,7 +185,7 @@ class Timeline:
       blackVideoFilename = f'./videos/black-videos/black-video-{float(interval[1] - interval[0])}.mp4'
       if not os.path.exists(blackVideoFilename):
         self.__generateBlackVideo(blackVideoFilename, interval[1] - interval[0], 720, 1280)
-      processedVideoList.append(Video(blackVideoFilename, [720, 1280], interval[0], end = interval[1] - interval[0]))
+      processedVideoList.append(Video(blackVideoFilename, [720, 1280], interval[0],30, end = interval[1] - interval[0]))
     processedVideoList.sort(key = lambda x: x.getTimelineStart())
     return processedVideoList
   
@@ -188,17 +211,20 @@ class Timeline:
         if self.deviceDim[i][j] is not None:
           processedVideoList = self.__preprocessVideoList(self.phoneGrid[i][j])
           videos = []
+          # print([i+1, j+1])
+          sumFrames = 0
           for video in processedVideoList:
             filename, start, end,fps, [x,y], cropDim = video.getVideoProcessingInfo()
+            # print(filename, (int(fps*end) - int(fps*start))/fps, sumFrames, start, end, fps)
+
+            sumFrames += (int(fps*end) - int(fps*start))/fps
             deviceWidth, deviceHeight, _ = self.deviceDim[i][j]
-            
             deviceResHeight = tabletResHeight if self.isTablet[i][j] else phoneResHeight
             #scale the width to keep it at the same aspect ratio given that the video height is phoneResHeight
             deviceResWidth = (deviceWidth / deviceHeight) * (deviceResHeight) 
 
             #all video dimensions need to be divisible by 2, so we round down to the nearest multiple of two
             deviceResWidth = (int(deviceResWidth) // 2) * 2
-            # print(ffmpeg.probe(filename)['streams'][0])
             ffmpegVideo = (ffmpeg.input(filename)
                             .trim(start_frame = int(fps*start), end_frame = int(fps*end))
                             .filter('fps', fps=30, round='up')
@@ -222,7 +248,9 @@ class Timeline:
           filenames = os.listdir('./videos/temp')
           filenames.sort(key = lambda x: int(x[:x.index('.')]))
           ffmpeg.concat(*[ffmpeg.input(f'./videos/temp/{x}') for x in filenames[:len(videos)]]).output(f'videos/output/{i+1}-{j+1}.mp4').overwrite_output().run()
-          # ffmpeg.concat(*videos).output(f'videos/output/{i+1}-{j+1}.mp4').overwrite_output().run()
+
+#[2,7]:4698
+          
         
             
 
@@ -257,10 +285,10 @@ class Timeline:
             self.vidStartTimes[id] = timelineStart
           relativeTo = None if row['relativeTo'] == '' else int(row['relativeTo']) 
           zIndex = 0 if row['zIndex'] == '' else int(row['zIndex'])
-          vidStart = 0 if row['vidStart'] == '' else int(row['vidStart'])
-          vidEnd = None if row['vidEnd'] == '' else int(row['vidEnd'])
+          vidStart = 0 if row['vidStart'] == '' else float(row['vidStart'])
+          vidEnd = None if row['vidEnd'] == '' else float(row['vidEnd'])
           vidOffset = [0,0] if row['vidOffset'] == '' else [int(x) for x in row['vidOffset'][1:-1].split(',')]
-          self.addVideo(tlPos, gridSize, filename, ar, timelineStart, id, isAbs=isAbs, relativeTo = relativeTo, zIndex = zIndex, vidStart=vidStart, vidEnd = vidEnd, vidOffset=vidOffset)
+          self.addVideo(tlPos, gridSize, filename, timelineStart, id, isAbs=isAbs, relativeTo = relativeTo, zIndex = zIndex, vidStart=vidStart, vidEnd = vidEnd, vidOffset=vidOffset)
 
   def printGrid(self):
     for row in self.phoneGrid:
@@ -284,6 +312,7 @@ for i in range(len(deviceDim)):
 
 testT = Timeline(deviceDim,isTablet, 103, 190)
 
-
+# print([(4, x) for x in range(3,14)])
 testT.readCSV('./csvs/exhibit-vids.csv')
-testT.processVideos()
+testT.processVideos(renderIndices=[(2,7)])
+# print(testT.getDevicePosInScreen([1,11], [0,0], [5,14], [1920,1080]))

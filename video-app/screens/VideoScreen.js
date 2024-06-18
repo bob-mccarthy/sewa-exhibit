@@ -7,6 +7,7 @@ import ntpClient from 'react-native-ntp-client';
 import * as FileSystem from 'expo-file-system'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Updates from 'expo-updates';
+import ws from '../Socket';
 
 
 
@@ -17,6 +18,7 @@ export default function VideoScreen({navigation, route}) {
   const action = useContext(ActionContext)
   const [showHeader, setShowHeader] = useState(false)
   const [paused, setPaused] = useState(true)
+  const [isDoneDownloading, setIsDoneDownloading] = useState(false)
   const videoRef = useRef(null)
   const refreshPage = async() =>{
     try {
@@ -27,10 +29,10 @@ export default function VideoScreen({navigation, route}) {
     }
   }
   const download = async (row, col) => {
+    setPaused(true)
     const callback = downloadProgress => {
       const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
     };
-    console.log(`http://192.168.0.223/video/${row}/${col}`)
     const downloadResumable = FileSystem.createDownloadResumable(
       `http://192.168.0.223/video/${row}/${col}`,
       FileSystem.documentDirectory + 'display-vid.mp4',
@@ -42,7 +44,8 @@ export default function VideoScreen({navigation, route}) {
       console.log('starting to download')
       const { uri } = await downloadResumable.downloadAsync();
       console.log('Finished downloading to ', uri);
-      refreshPage()
+      setIsDoneDownloading(true);
+      ws.send('downloaded');
     } catch (e) {
       console.error(e);
     } 
@@ -59,31 +62,38 @@ export default function VideoScreen({navigation, route}) {
   const handleEnd = () => {
     setPaused(true)
   }
-  const tap = Gesture.Tap()
-    .onBegin(() => {
+  const longPress = Gesture.LongPress().onEnd((e,success) => {
+    if (e.duration > 3000){
       setShowHeader(!showHeader)
-    });
+    }
+  })
+
   useEffect(() => {
     if(action?.message === 'start'){
       setPaused(true)
       videoRef.current?.seek(0)
-      ntpClient.getNetworkTime("192.168.0.223", 123, (error, date) => {
+      ntpClient.getNetworkTime('192.168.0.223', 123, (error, date) => {
           if (error) {
               console.error(error);
               return;
           }
           let startTime = new Date(action.startTime)
           let currTime = date
+          //if it gets the message after start time then do not play the video
+          if (currTime > startTime){
+            console.log('received after it was supposed to play')
+            return;
+          }
           setTimeout(() => {
             setPaused(false)
             console.log(`starting to play at: ${new Date()}`)
-            fetch(`${baseUrl}/logStart`)
+            ws.send('started')
+            
           }, startTime - currTime)
           // setTimeout(() => {
           //   setIsVisible(true)
           // }, startTime-currTime+(action.delay ? Math.random()*2000 : 0))
-          console.log(`current time: ${currTime} `)
-          console.log(`start time: ${startTime} `)
+          console.log(`current time: ${currTime}`)
           console.log(`time until unpaused: ${startTime-currTime}`)
       
           // console.log(`fetching current time: ${date}`); 
@@ -124,9 +134,9 @@ export default function VideoScreen({navigation, route}) {
           </TouchableOpacity>
         </SafeAreaView>
       }
-      <GestureDetector s gesture={tap}>
+      <GestureDetector s gesture={longPress}>
         <SafeAreaView style = {styles.videoCoverContainer}>
-        <SafeAreaView style = {[styles.videoCover, {zIndex: paused ? 1: 0}]}>
+        <SafeAreaView style = {[styles.videoCover, {zIndex: paused ? 1: 0}, {backgroundColor: isDoneDownloading ? 'green': 'black'}]}>
         </SafeAreaView>
         <SafeAreaView style = {styles.videoContainer} >
           <Video 
@@ -199,7 +209,6 @@ const styles = StyleSheet.create({
     position:'absolute',
     width:'100%',
     height:'100%',
-    backgroundColor: 'black',
   }
 
 });
