@@ -1,7 +1,6 @@
 import ffmpeg
 from Video import Video
 from utils import calculateBoundsForCenteredGivenScreen, intersect
-import ffmpeg
 import os, glob
 import json
 import csv
