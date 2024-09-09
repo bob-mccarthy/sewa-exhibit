@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, StatusBar } from 'react-native';
 import { useEffect, useState } from 'react';
 import WifiManager from "react-native-wifi-reborn";
 import { PermissionsAndroid } from 'react-native';
@@ -10,12 +10,19 @@ import ActionContext from '../Context';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import WebSocketManager from '../websocket';
 import {WIFI_SSID, WIFI_PASSWORD} from '@env'
+import * as NavigationBar from 'expo-navigation-bar'
 
 const Stack = createNativeStackNavigator();
 export default function HomePage() {
   const [action, setAction] = useState({message: 'nothing'})
   const [notConnected, setNotConnected] = useState<boolean>(false)
   const [connectionStr, setConnectionStr] = useState<string>("Click the reconnect button below")
+
+  const visibility = NavigationBar.useVisibility()
+    useEffect(()=> {
+      NavigationBar.setVisibilityAsync('hidden')
+    },[visibility])
+
   const connectToWifi = () => {
     WifiManager.connectToProtectedWifiSSID({ssid:WIFI_SSID, password: WIFI_PASSWORD}).then(
       () => { 
@@ -74,36 +81,36 @@ export default function HomePage() {
    return () => {
    };
    },[])
-  useEffect(() => {
-    PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      {
-        title: 'Location permission is required for WiFi connections',
-        message:
-          'This app needs location permission as this is required  ' +
-          'to scan for wifi networks.',
-        buttonNegative: 'DENY',
-        buttonPositive: 'ALLOW',
-      },
-    ).then((granted) => {
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        // You can now use react-native-wifi-reborn
-        WifiManager.getCurrentWifiSSID().then(
-          ssid => {
-            console.log("Your current connected wifi SSID is " + ssid);
-            if (ssid !== "NETGEAR94" && ssid !== "NETGEAR94-5G"){
-              setNotConnected(true)
-            }
-          },
-          () => {
-            console.log("Cannot get current SSID!");
-            setNotConnected(true)
-          }
-        ); 
-    } 
-    }) 
+  // useEffect(() => {
+  //   PermissionsAndroid.request(
+  //     PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+  //     {
+  //       title: 'Location permission is required for WiFi connections',
+  //       message:
+  //         'This app needs location permission as this is required  ' +
+  //         'to scan for wifi networks.',
+  //       buttonNegative: 'DENY',
+  //       buttonPositive: 'ALLOW',
+  //     },
+  //   ).then((granted) => {
+  //     if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+  //       // You can now use react-native-wifi-reborn
+  //       WifiManager.getCurrentWifiSSID().then(
+  //         ssid => {
+  //           console.log("Your current connected wifi SSID is " + ssid);
+  //           if (ssid !== "NETGEAR94" && ssid !== "NETGEAR94-5G"){
+  //             setNotConnected(true)
+  //           }
+  //         },
+  //         () => {
+  //           console.log("Cannot get current SSID!");
+  //           setNotConnected(true)
+  //         }
+  //       ); 
+  //   } 
+  //   }) 
     
-  }, [])
+  // }, [])
   return (
     <ActionContext.Provider value = {action}>
     {/* <NavigationContainer> */}
@@ -139,6 +146,7 @@ export default function HomePage() {
         />
       </Stack.Navigator>
     </View>
+    <StatusBar hidden translucent backgroundColor="transparent" />
     {/* </NavigationContainer> */}
     </ActionContext.Provider>
   );
