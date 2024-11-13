@@ -14,8 +14,15 @@ const Stack = createNativeStackNavigator();
 export default function App() {
   const [action, setAction] = useState<any>({message: 'nothing'})
   const visibility = NavigationBar.useVisibility()
+  useEffect(() => {
+    setInterval(() => {
+      NavigationBar.setVisibilityAsync('hidden')
+    }, 5000)
+  },[])
   useEffect(()=> {
     NavigationBar.setVisibilityAsync('hidden')
+    NavigationBar.setPositionAsync("absolute");
+    NavigationBar.setBackgroundColorAsync("transparent");
   },[visibility])
 
   const connectToWebSocket = () =>{
@@ -52,21 +59,21 @@ export default function App() {
    };
   }
 
-  useEffect(() => {
+  // useEffect(() => {
     
-    console.log('starting up')
-    connectToWebSocket()
+  //   console.log('starting up')
+  //   connectToWebSocket()
     
-   return () => {
-   };
-   },[])
+  //  return () => {
+  //  };
+  //  },[])
   return (
     <>
     <ActionContext.Provider value = {action}>
       <NavigationContainer >
-        <Stack.Navigator screenOptions={{headerShown: false}}>
-          <Stack.Screen name="Video" component={VideoScreen} />
+        <Stack.Navigator screenOptions={{headerShown: false}} initialRouteName='Settings'>
           <Stack.Screen name="Settings" component={SettingScreen} />
+          <Stack.Screen name="Video" component={VideoScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       <StatusBar hidden translucent backgroundColor="transparent" />

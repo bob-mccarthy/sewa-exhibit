@@ -13,7 +13,7 @@ export default function VideoScreen({navigation} : any)
     const [debugMode, setDebugMode] = useState<boolean>(false)
     const [displayVid, setDisplayVid] = useState<string | null>(null)
     const [showHeader, setShowHeader] = useState<boolean>(false)
-    const [paused, setPaused] = useState<boolean>(true)
+    const [paused, setPaused] = useState<boolean>(false)
     const [hideVideo, setHideVideo] = useState<boolean>(false) //hideVideo is true when the exhibit needs to be turned off
 
     useFocusEffect(() => {
@@ -103,10 +103,10 @@ export default function VideoScreen({navigation} : any)
                         style = {{
                             flex: 1
                         }}
-                        source = {{uri: displayVid}}
+                        source = {{uri:displayVid}}
                         repeat = {true}
                         paused = {paused}
-                        controls>
+                        >
                     </Video>
                     }
                 </View>

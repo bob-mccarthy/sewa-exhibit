@@ -2,3 +2,4 @@ __pycache__/
 videos/
 phoneDim.json
 csvs/
+env/

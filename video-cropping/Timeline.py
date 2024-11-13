@@ -87,14 +87,14 @@ class Timeline:
       try:
         metadata = ffmpeg.probe(filename)
       except ffmpeg.Error as e:
-        # print('stdout:', e.stdout.decode('utf8'))
+        print('stdout:', e.stdout.decode('utf8'))
         print('stderr:', e.stderr.decode('utf8'))
         raise e
       fpsNum, fpsDiv = metadata['streams'][0]['avg_frame_rate'].split('/')
       fps = int(fpsNum) / int(fpsDiv)
       width, height = metadata['streams'][0]['width'], metadata['streams'][0]['height']
       end = float(metadata['streams'][0]['duration'])
-      
+      print(f'filename {filename} end {end}')
       self.vidInfo[filename] = {'fps': fps, 'width':width, 'height': height, 'end': end}
     ar = [width, height]
     #if the positioning of clip on the timeline is not absolute (it is relative)
@@ -181,10 +181,10 @@ class Timeline:
     #for all of the remaining intervals which do not have a video in them
     #they fill it with black videos
     for interval in freeIntervals:
-      blackVideoFilename = f'./videos/black-videos/black-video-{float(interval[1] - interval[0])}.mp4'
+      blackVideoFilename = f'./videos/black-videos/black-video-{round(float(interval[1] - interval[0]) * 30) / 30}.mp4'
       if not os.path.exists(blackVideoFilename):
-        self.__generateBlackVideo(blackVideoFilename, interval[1] - interval[0], 720, 1280)
-      processedVideoList.append(Video(blackVideoFilename, [720, 1280], interval[0],30, end = interval[1] - interval[0]))
+        self.__generateBlackVideo(blackVideoFilename, round(float(interval[1] - interval[0]) * 30) / 30, 720, 1280)
+      processedVideoList.append(Video(blackVideoFilename, [720, 1280], interval[0],30, end = round(float(interval[1] - interval[0]) * 30) / 30))
     processedVideoList.sort(key = lambda x: x.getTimelineStart())
     return processedVideoList
   
@@ -212,10 +212,10 @@ class Timeline:
           videos = []
           # print([i+1, j+1])
           sumFrames = 0
+          print()
           for video in processedVideoList:
             filename, start, end,fps, [x,y], cropDim = video.getVideoProcessingInfo()
-            # print(filename, (int(fps*end) - int(fps*start))/fps, sumFrames, start, end, fps)
-
+            print(filename,int(fps*end) - int(fps*start), (int(fps*end) - int(fps*start))/fps,f'sum frames: {sumFrames}', start, end, fps)
             sumFrames += (int(fps*end) - int(fps*start))/fps
             deviceWidth, deviceHeight, _ = self.deviceDim[i][j]
             deviceResHeight = tabletResHeight if self.isTablet[i][j] else phoneResHeight
@@ -224,10 +224,12 @@ class Timeline:
 
             #all video dimensions need to be divisible by 2, so we round down to the nearest multiple of two
             deviceResWidth = (int(deviceResWidth) // 2) * 2
+            print(f'start frame {int(fps*start)}, end frame {int(fps*end)} ')
             ffmpegVideo = (ffmpeg.input(filename)
                             .trim(start_frame = int(fps*start), end_frame = int(fps*end))
                             .filter('fps', fps=30, round='up')
-                            .setpts ('PTS-STARTPTS'))
+                            .setpts ('PTS-STARTPTS')
+                            )
             if cropDim:
               width, height = cropDim
               cropInstructions = [width, height, x, y]
@@ -277,7 +279,7 @@ class Timeline:
           gridSize = [int(x) for x in row['gridSize'][1:-1].split(',')]
           filename = row['filename']
           ar = [int(x) for x in row['ar'][1:-1].split(',')]
-          timelineStart = int(row['timelineStart'])
+          timelineStart = float(row['timelineStart'])
           id = int(row['id'])
           isAbs = True if row['isAbs'] == '' or row['isAbs'] == 'TRUE' else False
           if isAbs:
@@ -296,6 +298,7 @@ class Timeline:
         print(f'[{(len(col) * "x") + ((5-len(col)) * " ")}], ', end = "")
         
       print(']')
+
 f = open('phoneDim.json')
 dct = json.load(f)
 
@@ -313,5 +316,6 @@ testT = Timeline(deviceDim,isTablet, 103, 190)
 
 # print([(4, x) for x in range(3,14)])
 testT.readCSV('./csvs/exhibit-vids.csv')
-testT.processVideos(renderIndices=[(2,7)])
+# testT.processVideos()
+testT.processVideos(renderIndices=[(3,4)])
 # print(testT.getDevicePosInScreen([1,11], [0,0], [5,14], [1920,1080]))

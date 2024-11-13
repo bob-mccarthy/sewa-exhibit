@@ -60,6 +60,19 @@ export default function SettingScreen({navigation}: any)
                             }}
                             key = {i} 
                             onPressIn={() => setSelectedVid(i)}>
+                            {/* <Text
+                                style = {{
+                                    flexBasis: '33%',
+                                    borderWidth: selectedVid === i ? 10 : 0,
+                                    borderColor: 'skyblue',
+                                    // width: 200,
+                                    // height: '50%'
+                                    margin: 5,
+                                    flex: 1
+                                }}>
+                                {asset.uri}
+                                
+                            </Text> */}
                             <Video 
                                 style = {{
                                     flexBasis: '33%',

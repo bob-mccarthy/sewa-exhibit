@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, StatusBar } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, StatusBar, DevSettings } from 'react-native';
 import { useEffect, useState } from 'react';
 import WifiManager from "react-native-wifi-reborn";
 import { PermissionsAndroid } from 'react-native';
@@ -11,6 +11,23 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import WebSocketManager from '../websocket';
 import {WIFI_SSID, WIFI_PASSWORD} from '@env'
 import * as NavigationBar from 'expo-navigation-bar'
+import * as Updates from 'expo-updates';
+import ErrorBoundary from 'react-native-error-boundary'
+import {setNativeExceptionHandler, setJSExceptionHandler} from 'react-native-exception-handler'
+
+const exceptionHandler = (exceptionString:String) => {
+  console.log("My custom exception handler")
+  console.log(`Error: ${exceptionString}`)
+  Updates.reloadAsync()
+  // DevSettings.reload()
+};
+
+const jsExceptionHandler = (error:Error, isFatal: boolean|undefined) => {
+  console.log("My custom js exception handler")
+  console.log(`Error: ${error}`)
+  Updates.reloadAsync()
+  // DevSettings.reload()
+};
 
 const Stack = createNativeStackNavigator();
 export default function HomePage() {
@@ -18,8 +35,18 @@ export default function HomePage() {
   const [notConnected, setNotConnected] = useState<boolean>(false)
   const [connectionStr, setConnectionStr] = useState<string>("Click the reconnect button below")
 
+  
+
   const visibility = NavigationBar.useVisibility()
     useEffect(()=> {
+      setNativeExceptionHandler(
+        exceptionHandler,
+        true,
+        false
+      );
+      setJSExceptionHandler(jsExceptionHandler)
+      
+      
       NavigationBar.setVisibilityAsync('hidden')
     },[visibility])
 
@@ -75,7 +102,6 @@ export default function HomePage() {
   }
   useEffect(() => {
     
-    console.log('starting up')
     connectToWebSocket()
     
    return () => {
