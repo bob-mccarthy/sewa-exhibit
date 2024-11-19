@@ -1,6 +1,7 @@
 import ffmpeg
 from Video import Video
-from utils import calculateBoundsForCenteredGivenScreen, intersect
+from utils import calculateBoundsForCenteredGivenScreen, intersect, get_video_frame_count, get_length, get_fps
+import subprocess
 import os, glob
 import json
 import csv
@@ -9,7 +10,7 @@ mmToPixels = 1 / (25.4/160)
 class Timeline:
   #deviceDim: 2D array where element i,j is the dimensions of the window size of phone in pixels, and
   #xSpacing and ySpacing are the spacing between the centers of the phones in their respective dimensions
-  def __init__(self, deviceDim, isTablet, xSpacing,ySpacing):
+  def __init__(self, deviceDim, isTablet, xSpacing,ySpacing, cacheFolder = ""):
     #are pixel measurements are scaled such that there are 160 pixels per inch 
     
     height = len(deviceDim)
@@ -25,7 +26,7 @@ class Timeline:
     self.isTablet = isTablet
     self.vidStartTimes={} #dictionary of videos ids with their timeline starts as the values
     self.vidInfo = {} #dictionary containing video, dimensions and fps
-    
+    self.cacheFolder = cacheFolder
     
     
   #gets the dimensions of the screen, offset , given the top left corner and the size of the grid 
@@ -85,6 +86,7 @@ class Timeline:
       end = self.vidInfo[filename]['end']
     else:
       try:
+        # print(filename)
         metadata = ffmpeg.probe(filename)
       except ffmpeg.Error as e:
         print('stdout:', e.stdout.decode('utf8'))
@@ -94,7 +96,7 @@ class Timeline:
       fps = int(fpsNum) / int(fpsDiv)
       width, height = metadata['streams'][0]['width'], metadata['streams'][0]['height']
       end = float(metadata['streams'][0]['duration'])
-      print(f'filename {filename} end {end}')
+      # print(f'filename {filename} end {end}')
       self.vidInfo[filename] = {'fps': fps, 'width':width, 'height': height, 'end': end}
     ar = [width, height]
     #if the positioning of clip on the timeline is not absolute (it is relative)
@@ -147,7 +149,8 @@ class Timeline:
             cropPos = [deviceTopLeftX, deviceTopLeftY], 
             cropDim=[int(int(self.deviceDim[i][j][0]) * scaleFac),int(int(self.deviceDim[i][j][1]) * scaleFac) ], 
             zIndex = zIndex, start=vidStart, 
-            end=vidEnd if vidEnd is not None else end
+            end=vidEnd if vidEnd is not None else end,
+            cacheFolder= self.cacheFolder
             )
           )
         if not duration:
@@ -181,17 +184,17 @@ class Timeline:
     #for all of the remaining intervals which do not have a video in them
     #they fill it with black videos
     for interval in freeIntervals:
-      blackVideoFilename = f'./videos/black-videos/black-video-{round(float(interval[1] - interval[0]) * 30) / 30}.mp4'
+      blackVideoFilename = f'./videos/black-videos/black-video-{round(float(interval[1] - interval[0]) * 30) / 30}.avi'
       if not os.path.exists(blackVideoFilename):
         self.__generateBlackVideo(blackVideoFilename, round(float(interval[1] - interval[0]) * 30) / 30, 720, 1280)
-      processedVideoList.append(Video(blackVideoFilename, [720, 1280], interval[0],30, end = round(float(interval[1] - interval[0]) * 30) / 30))
+      processedVideoList.append(Video(blackVideoFilename, [720, 1280], interval[0],30, end = round(float(interval[1] - interval[0]) * 30) / 30, cacheFolder=None))
     processedVideoList.sort(key = lambda x: x.getTimelineStart())
     return processedVideoList
   
   def __generateBlackVideo(self, output_file, duration, width, height):
     framerate = 30
     # Generate black video directly with specified duration
-    ffmpeg.input('color=black:s={}x{}:duration={}'.format(width, height, duration), f='lavfi').output(output_file, t=duration, r=framerate).run()
+    ffmpeg.input('color=black:s={}x{}:duration={}'.format(width, height, duration), f='lavfi').output(output_file, t=duration, r=framerate, vcodec='mjpeg').run()
       
   def processVideos(self, renderIndices = None):
     phoneResHeight = 1280 #maximum height of video is 1280 and we scale width accordingly
@@ -212,11 +215,16 @@ class Timeline:
           videos = []
           # print([i+1, j+1])
           sumFrames = 0
-          print()
+          sumTime = 0
+          # print()
+          # print()
+          vidNameFramesAndTime = []
           for video in processedVideoList:
             filename, start, end,fps, [x,y], cropDim = video.getVideoProcessingInfo()
-            print(filename,int(fps*end) - int(fps*start), (int(fps*end) - int(fps*start))/fps,f'sum frames: {sumFrames}', start, end, fps)
-            sumFrames += (int(fps*end) - int(fps*start))/fps
+            sumFrames += (int(fps*end) - int(fps*start))
+            sumTime += end-start
+            print(filename,f'frames{int(fps*end) - int(fps*start)}', (int(fps*end) - int(fps*start))/fps,f'sum frames: {sumFrames}', f'sumTime: {sumTime}', start, end, f'fps: {fps}')
+            vidNameFramesAndTime.append(f'filename: {filename}, numFrames: {int(fps*end) - int(fps*start)}, totTime: {end - start}, sumTime: {sumTime}')
             deviceWidth, deviceHeight, _ = self.deviceDim[i][j]
             deviceResHeight = tabletResHeight if self.isTablet[i][j] else phoneResHeight
             #scale the width to keep it at the same aspect ratio given that the video height is phoneResHeight
@@ -224,18 +232,18 @@ class Timeline:
 
             #all video dimensions need to be divisible by 2, so we round down to the nearest multiple of two
             deviceResWidth = (int(deviceResWidth) // 2) * 2
-            print(f'start frame {int(fps*start)}, end frame {int(fps*end)} ')
+            # print(f'start frame {int(fps*start)}, end frame {int(fps*end)} ')
+            # print(f'og file frame rate: {get_fps(filename)}')
             ffmpegVideo = (ffmpeg.input(filename)
+                          #  .trim(start_frame = start, end = end)
                             .trim(start_frame = int(fps*start), end_frame = int(fps*end))
-                            .filter('fps', fps=30, round='up')
+                            # .filter('fps', fps=30, round='up')
                             .setpts ('PTS-STARTPTS')
                             )
             if cropDim:
               width, height = cropDim
               cropInstructions = [width, height, x, y]
               ffmpegVideo = ffmpegVideo.filter('crop', *cropInstructions)
-
-            
 
             ffmpegVideo = (ffmpegVideo.filter('scale', deviceResWidth, deviceResHeight)
                             .filter('setsar', 1))
@@ -244,11 +252,17 @@ class Timeline:
               ffmpegVideo = ffmpegVideo.filter('transpose', dir='clock')
             
             videos.append(ffmpegVideo)
+          sumOfLengths = 0
           for k in range(len(videos)):
-            videos[k].output(f'videos/temp/{k}.mp4').overwrite_output().run()
+            videos[k].output(f'videos/temp/{k}.mp4', r = 30).overwrite_output().global_args( '-v', 'quiet').run()
+            sumOfLengths += get_length(f'videos/temp/{k}.mp4')
+            # print(vidNameFramesAndTime[k], f'real frames: {get_video_frame_count(f'videos/temp/{k}.mp4')}',  f'real tot Time:{get_length(f'videos/temp/{k}.mp4')}', f'fps: {get_fps(f'videos/temp/{k}.mp4')}', f'curr sum time: {sumOfLengths}') 
+            
           filenames = os.listdir('./videos/temp')
           filenames.sort(key = lambda x: int(x[:x.index('.')]))
-          ffmpeg.concat(*[ffmpeg.input(f'./videos/temp/{x}') for x in filenames[:len(videos)]]).output(f'videos/output/{i+1}-{j+1}.mp4').overwrite_output().run()
+          ffmpeg.concat(*[ffmpeg.input(f'./videos/temp/{x}') for x in filenames[:len(videos)]]).output(f'videos/output/{i+1}-{j+1}.mp4', r = 30).overwrite_output().global_args('-v', 'quiet').run()
+          print(f'finsihed videos/output/{i+1}-{j+1}.mp4')
+          # print(f'actual length: {get_length(f'videos/output/{i+1}-{j+1}.mp4')}, projected length: {sumOfLengths}')
 
 #[2,7]:4698
           
@@ -312,10 +326,10 @@ for i in range(len(deviceDim)):
       deviceDim[i][j][2] = int(deviceDim[i][j][2] * mmToPixels)
 
 
-testT = Timeline(deviceDim,isTablet, 103, 190)
+testT = Timeline(deviceDim,isTablet, 103, 190, cacheFolder = "/Volumes/LaCie/Sewa Exhibit/cache")
 
 # print([(4, x) for x in range(3,14)])
 testT.readCSV('./csvs/exhibit-vids.csv')
 # testT.processVideos()
-testT.processVideos(renderIndices=[(3,4)])
+testT.processVideos(renderIndices= [(5,0), (4,0)])
 # print(testT.getDevicePosInScreen([1,11], [0,0], [5,14], [1920,1080]))

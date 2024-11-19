@@ -1,9 +1,33 @@
 import ffmpeg
+import subprocess
+import os
 
 class Video:
-  def __init__(self, filename, totDim,timelineStart,fps,cropPos = [0,0],  cropDim = None, zIndex =0,start = 0, end = None):
+  def __init__(self, filename, totDim,timelineStart,fps,cropPos = [0,0],  cropDim = None, zIndex =0,start = 0, end = None, cacheFolder = "/"):
     # print(filename)
+    self.cachedFolder = cacheFolder
     self.filename = filename
+    if cacheFolder == None:
+      #if we are not caching this file then just use the normal filename as the cache name
+      self.cacheFilename = filename
+      self.cachedFps = fps
+    else:
+      #we make a cached version of the file which we encode encode in the mjpeg avi format so we can seek to every frame cut it
+      self.cacheFilename = cacheFolder +'/' + filename.replace("/", "-").replace(".mp4", ".avi")
+      self.cachedFps = 30
+      if not os.path.exists(self.cacheFilename):
+        command = [
+        'ffmpeg',             
+        '-i', filename,      # Input video file
+        '-r', '30',             # Set the frame rate to 30 fps
+        '-c:v', 'mjpeg',        # Set video codec to MJPEG
+        '-q:v', '5',            # Set MJPEG quality (1 = best, 31 = worst)
+        '-c:a', 'pcm_s16le',    # Set audio codec to PCM (16-bit little-endian)
+        self.cacheFilename            # Output file name
+        ]
+
+        # reencode the file mjpeg avi format so we can cleanly seek to any frame we want
+        subprocess.run(command)
     self.zIndex = zIndex
     self.start = start #where in the video should it start from its beginning (in seconds)
     self.fps = fps 
@@ -15,7 +39,7 @@ class Video:
     self.timelineStart = timelineStart #where on the timeline the video starts playing
 
   def copy(self):
-    return Video(self.filename, self.totDim, self.timelineStart,self.fps, cropPos = self.cropPos, cropDim = self.cropDim, zIndex=self.zIndex, start = self.start, end = self.end)
+    return Video(self.filename, self.totDim, self.timelineStart,self.fps, cropPos = self.cropPos, cropDim = self.cropDim, zIndex=self.zIndex, start = self.start, end = self.end, cacheFolder=self.cachedFolder)
   
   def getFps(self):
     return self.fps
@@ -33,8 +57,11 @@ class Video:
   def getZIndex(self):
     return self.zIndex
   
+  #this gets all the info needed for rendering the video to the proper length
+  #We used the cacheFilename because we reencode the video in avi mjpeg format so that the video is seekable to the frame
+  #so we can cut the videos exactly to the frame
   def getVideoProcessingInfo(self):
-    return [self.filename, self.start, self.end,self.fps, self.cropPos, self.cropDim]
+    return [self.cacheFilename, self.start, self.end,self.cachedFps, self.cropPos, self.cropDim]
     # return {'filename': self.filename,'start': self.start, 'end': self.end, 'cropPos' : self.cropPos, 'cropDim': self.cropDim}
 
   def setTimelineStart(self, timelineStart):
@@ -62,13 +89,13 @@ class Video:
     self.timelineStart = newTimelineStart
 
 
-import ffmpeg
+# import ffmpeg
 
-metadata = ffmpeg.probe('/Volumes/LaCie/Sewa Exhibit/assets/Homework/Crafts/3.mp4')
-print(metadata['streams'][0]['width'], metadata['streams'][0]['height'])
+
 
 # try:
-#   metadata = ffmpeg.probe(filename)
+#   metadata = ffmpeg.probe('/Volumes/LaCie/Sewa Exhibit/assets/Homework/Crafts/3.mp4')
+#   print(metadata['streams'][0]['width'], metadata['streams'][0]['height'])
 # except ffmpeg.Error as e:
 #   # print('stdout:', e.stdout.decode('utf8'))
 #   print('stderr:', e.stderr.decode('utf8'))

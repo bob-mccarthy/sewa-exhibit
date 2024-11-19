@@ -1,4 +1,5 @@
-
+import subprocess
+import json
 #given a list of intervals of the form [start,end] and an bigger interval which contains the entire list of intervals
 #this function returns all the remaining intervals which are not covered by the input list 
 def findFillerIntervals(intervals, totalInterval):
@@ -91,40 +92,78 @@ def calculateBoundsForCentered(c,r,w,h):
   #returns coordinate of the Top Left corner of the Bottom Right Corner are on the original video
   return [[videoCenterX - screenCenterX, videoCenterY - screenCenterY],[videoCenterX + screenCenterX, videoCenterY + screenCenterY]]
 
-
-# import ffmpeg
-# import math
-
-# def rotate_video(input_file, output_file, rotation_angle):
-#     (
-#         ffmpeg
-#         .input(input_file)
-#         .filter('rotate', angle=rotation_angle)
-#         .output(output_file)
-#         .run()
-#     )
-
-# # Example usage:
-# input_file = './videos/input/drakex21.mp4'
-# output_file = 'output_rotated.mp4'
-# rotation_angle = math.pi/2  # Possible values: 'clock', 'cclock', 'cclock_flip', 'clock_flip'
-
-# def rotate_video(input_file, output_file, rotation_angle):
-#     (
-#         ffmpeg
-#         .input(input_file)
-#         .filter('transpose', dir='clock')  # Rotate counterclockwise
-#         # .filter('scale', w='iw*1.5', h='ih*1.5')  # Scale up to handle the aspect ratio change
-#         # .filter('crop', w='iw*0.75', h='ih*0.75')  # Crop to maintain the aspect ratio
-#         .output(output_file)
-#         .run()
-#     )
-
-# # Example usage:
-# input_file = './videos/input/drakex21.mp4'
-# output_file = 'output_rotated.mp4'
-
-# # rotate_video(input_file, output_file)
-# # 
-# rotate_video(input_file, output_file, rotation_angle)
+def get_length(filename):
+    result = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                             "format=duration", "-of",
+                             "default=noprint_wrappers=1:nokey=1", filename],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT)
+    return float(result.stdout)
+def get_fps(video_path):
+    command = [
+        'ffprobe', 
+        '-v', 'error', 
+        '-select_streams', 'v:0',  # Select the first video stream
+        '-show_entries', 'stream=r_frame_rate',  # Get number of frames
+        '-of', 'json',  # Output in JSON format
+        video_path
+    ]
+    try:
+        # Run the ffprobe command and capture the output
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        
+        # Parse the output as JSON
+        info = json.loads(result.stdout)
+        if info == {}:
+            return 0
+        # print(video_path, info)
+        # Extract the number of frames
+        fps = info['streams'][0].get('r_frame_rate')
+        
+        if fps is None:
+            raise ValueError("Frame count not found in ffprobe output")
+        
+        return fps
+    
+    except subprocess.CalledProcessError as e:
+        print(f"Error running ffprobe: {e}")
+        return None
+    except json.JSONDecodeError:
+        print("Error decoding ffprobe output.")
+        return None
+   
+def get_video_frame_count(video_path):
+    # Run ffprobe command to get video stream information in JSON format
+    command = [
+        'ffprobe', 
+        '-v', 'error', 
+        '-select_streams', 'v:0',  # Select the first video stream
+        '-show_entries', 'stream=nb_frames',  # Get number of frames
+        '-of', 'json',  # Output in JSON format
+        video_path
+    ]
+    
+    try:
+        # Run the ffprobe command and capture the output
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        
+        # Parse the output as JSON
+        info = json.loads(result.stdout)
+        if info == {}:
+            return 0
+        # print(video_path, info)
+        # Extract the number of frames
+        frame_count = info['streams'][0].get('nb_frames')
+        
+        if frame_count is None:
+            raise ValueError("Frame count not found in ffprobe output")
+        
+        return int(frame_count)
+    
+    except subprocess.CalledProcessError as e:
+        print(f"Error running ffprobe: {e}")
+        return None
+    except json.JSONDecodeError:
+        print("Error decoding ffprobe output.")
+        return None
 
