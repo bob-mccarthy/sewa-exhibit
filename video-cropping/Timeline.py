@@ -99,6 +99,7 @@ class Timeline:
       # print(f'filename {filename} end {end}')
       self.vidInfo[filename] = {'fps': fps, 'width':width, 'height': height, 'end': end}
     ar = [width, height]
+    print(ar)
     #if the positioning of clip on the timeline is not absolute (it is relative)
     #then we loop through the last video in all of the grid slots this video will take up
     #find the video out of all of those slots that ends last and then our video will start
@@ -121,12 +122,13 @@ class Timeline:
 
 
     screenWidth, screenHeight, offset = self.getScreenDimInfo(tlPos, gridSize)
+    print(screenWidth, screenHeight)
     # print(screenWidth, screenHeight, ar[0], ar[1])
-    tl, scaleFac = calculateBoundsForCenteredGivenScreen(screenWidth, screenHeight, ar[0], ar[1]) # get the tl of the cropped video and scaleFactor which is (size of video/size of screen)
+    tl, scaleFac = calculateBoundsForCenteredGivenScreen(screenWidth, screenHeight, ar[0], ar[1]) # get the topleft of the cropped video and scaleFactor which is (size of video/size of screen)
     # print(offset)
     tl[0] += vidOffset[0]
     tl[1] += vidOffset[1]
-
+    print(tl, scaleFac)
     duration = None
     for i in range(tlPos[0], tlPos[0]+rows):
       for j in range(tlPos[1], tlPos[1]+cols):
@@ -223,7 +225,7 @@ class Timeline:
             filename, start, end,fps, [x,y], cropDim = video.getVideoProcessingInfo()
             sumFrames += (int(fps*end) - int(fps*start))
             sumTime += end-start
-            print(filename,f'frames{int(fps*end) - int(fps*start)}', (int(fps*end) - int(fps*start))/fps,f'sum frames: {sumFrames}', f'sumTime: {sumTime}', start, end, f'fps: {fps}')
+            # print(filename,f'frames{int(fps*end) - int(fps*start)}', (int(fps*end) - int(fps*start))/fps,f'sum frames: {sumFrames}', f'sumTime: {sumTime}', start, end, f'fps: {fps}')
             vidNameFramesAndTime.append(f'filename: {filename}, numFrames: {int(fps*end) - int(fps*start)}, totTime: {end - start}, sumTime: {sumTime}')
             deviceWidth, deviceHeight, _ = self.deviceDim[i][j]
             deviceResHeight = tabletResHeight if self.isTablet[i][j] else phoneResHeight
@@ -261,7 +263,7 @@ class Timeline:
           filenames = os.listdir('./videos/temp')
           filenames.sort(key = lambda x: int(x[:x.index('.')]))
           ffmpeg.concat(*[ffmpeg.input(f'./videos/temp/{x}') for x in filenames[:len(videos)]]).output(f'videos/output/{i+1}-{j+1}.mp4', r = 30).overwrite_output().global_args('-v', 'quiet').run()
-          print(f'finsihed videos/output/{i+1}-{j+1}.mp4')
+          print(f'finished videos/output/{i+1}-{j+1}.mp4')
           # print(f'actual length: {get_length(f'videos/output/{i+1}-{j+1}.mp4')}, projected length: {sumOfLengths}')
 
 #[2,7]:4698
@@ -326,10 +328,12 @@ for i in range(len(deviceDim)):
       deviceDim[i][j][2] = int(deviceDim[i][j][2] * mmToPixels)
 
 
-testT = Timeline(deviceDim,isTablet, 103, 190, cacheFolder = "/Volumes/LaCie/Sewa Exhibit/cache")
+# testT = Timeline(deviceDim,isTablet, 103, 190, cacheFolder = "/Volumes/LaCie/Sewa Exhibit/cache")
+testT = Timeline(deviceDim,isTablet, 86, 173, cacheFolder = "./cache")
 
 # print([(4, x) for x in range(3,14)])
-testT.readCSV('./csvs/exhibit-vids.csv')
+# testT.readCSV('./csvs/exhibit-vids.csv')
+testT.readCSV('./csvs/ps70-fair.csv')
 # testT.processVideos()
-testT.processVideos(renderIndices= [(5,0), (4,0)])
+testT.processVideos()
 # print(testT.getDevicePosInScreen([1,11], [0,0], [5,14], [1920,1080]))
